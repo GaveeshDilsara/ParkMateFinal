@@ -1,0 +1,124 @@
+[19-Aug-2025 20:12:42 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'gaveesh' for key 'uq_username' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:14:42 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:18:12 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:18:42 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:19:16 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:19:52 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:25:12 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:25:14 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 16:26:14 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'a@a.a' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[20-Aug-2025 17:59:41 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:54
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 54
+[20-Aug-2025 17:59:43 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:54
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 54
+[20-Aug-2025 18:00:39 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:54
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 54
+[20-Aug-2025 18:04:37 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:54
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 54
+[20-Aug-2025 18:05:25 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:45
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 45
+[20-Aug-2025 18:07:15 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:45
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 45
+[20-Aug-2025 18:16:59 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:43
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 43
+[20-Aug-2025 18:17:12 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:43
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 43
+[20-Aug-2025 18:59:01 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:43
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 43
+[20-Aug-2025 19:04:38 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:47
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 47
+[20-Aug-2025 19:08:56 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:47
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 47
+[20-Aug-2025 19:16:12 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:56
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 56
+[20-Aug-2025 20:35:18 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:56
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 56
+[21-Aug-2025 06:09:59 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:56
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 56
+[21-Aug-2025 06:11:12 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:56
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 56
+[21-Aug-2025 06:14:23 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function json_out() in C:\xampp\htdocs\ParkMate\create_payment.php:56
+Stack trace:
+#0 {main}
+  thrown in C:\xampp\htdocs\ParkMate\create_payment.php on line 56
+[21-Aug-2025 10:57:58 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'q@q.q' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[21-Aug-2025 10:58:03 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'q@q.q' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40
+[21-Aug-2025 10:58:07 Europe/Berlin] PHP Fatal error:  Uncaught mysqli_sql_exception: Duplicate entry 'q@q.q' for key 'uq_email' in C:\xampp\htdocs\ParkMate\register_owner.php:40
+Stack trace:
+#0 C:\xampp\htdocs\ParkMate\register_owner.php(40): mysqli_stmt->execute()
+#1 {main}
+  thrown in C:\xampp\htdocs\ParkMate\register_owner.php on line 40

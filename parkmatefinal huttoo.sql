@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 21, 2025 at 06:16 PM
+-- Generation Time: Aug 21, 2025 at 08:28 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -110,7 +110,8 @@ INSERT INTO `parking_space` (`id`, `owner_id`, `parking_name`, `location`, `avai
 (9, 27, 'gaveesh', 'Colombo, Colombo, Western Province, Sri Lanka', 'Tue 12:00 PM — 3:00 PM; Wed 9:00 AM — 5:00 PM; Thu 9:00 AM — 10:00 AM', 'accept', 'bnakhbbdinnsss', 'uploads/owners/27/gaveesh/agreement_27_gaveesh_1755766803.pdf', 'uploads/owners/27/gaveesh/', 6.902274, 79.860473, '2025-08-21 09:00:03'),
 (10, 1, 'viharamahadewi', 'Colombo, Colombo, Western Province, Sri Lanka', 'Tue 12:00 PM — 3:00 PM; Wed 9:00 AM — 5:00 PM; Thu 9:00 AM — 10:00 AM', 'accept', '', NULL, 'uploads/owners/1/viharamahadewi/', 6.902274, 79.860473, '2025-08-21 09:20:10'),
 (11, 1, 'dushan', 'Station Road, Station Road, Colombo, Western Province, Sri Lanka', 'Tue 12:00 PM — 3:00 PM; Wed 9:00 AM — 5:00 PM; Thu 9:00 AM — 10:00 AM', 'accept', '', NULL, 'uploads/owners/1/dushan/', 6.893575, 79.854477, '2025-08-21 09:48:45'),
-(12, 1, 'Hawalock', 'Havelock Road, Havelock Road, Colombo, Western Province, Sri Lanka', 'Wed 9:00 AM — 5:00 PM; Thu 9:00 AM — 10:00 AM', 'accept', '', NULL, 'uploads/owners/1/hawalock/', 6.874065, 79.871719, '2025-08-21 15:06:16');
+(12, 1, 'Hawalock', 'Havelock Road, Havelock Road, Colombo, Western Province, Sri Lanka', 'Wed 9:00 AM — 5:00 PM; Thu 9:00 AM — 10:00 AM', 'accept', '', NULL, 'uploads/owners/1/hawalock/', 6.874065, 79.871719, '2025-08-21 15:06:16'),
+(13, 1, 'Chamara', 'Baseline Road, Baseline Road, Colombo, Western Province, Sri Lanka', 'Sat 10:00 AM — 5:00 PM; Sun 9:00 AM — 1:00 PM', 'accept', 'ane mta ba', 'uploads/owners/1/chamara/agreement_1_chamara_1755800794.pdf', 'uploads/owners/1/chamara/', 6.878379, 79.876503, '2025-08-21 18:26:34');
 
 -- --------------------------------------------------------
 
@@ -167,7 +168,8 @@ INSERT INTO `pricing` (`id`, `parking_space_id`, `price_unit`, `cars`, `vans`, `
 (9, 9, 'hour', 150, 150, 150, 150),
 (10, 10, 'hour', 150, 150, 150, 100),
 (11, 11, 'hour', 50, 50, 50, 100),
-(12, 12, 'hour', 50, 50, 100, 100);
+(12, 12, 'hour', 50, 50, 100, 100),
+(13, 13, 'hour', 200, 150, 100, 50);
 
 -- --------------------------------------------------------
 
@@ -200,7 +202,8 @@ INSERT INTO `spaces` (`id`, `parking_space_id`, `cars`, `vans`, `bikes`, `buses`
 (9, 9, 4, 4, 4, 4),
 (10, 10, 3, 3, 3, 2),
 (11, 11, 2, 2, 2, 2),
-(12, 12, 1, 1, 1, 1);
+(12, 12, 1, 1, 1, 1),
+(13, 13, 4, 3, 2, 1);
 
 -- --------------------------------------------------------
 
@@ -310,7 +313,7 @@ ALTER TABLE `ownerdetails`
 -- AUTO_INCREMENT for table `parking_space`
 --
 ALTER TABLE `parking_space`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `payments`
@@ -322,13 +325,13 @@ ALTER TABLE `payments`
 -- AUTO_INCREMENT for table `pricing`
 --
 ALTER TABLE `pricing`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `spaces`
 --
 ALTER TABLE `spaces`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `vehicles`

@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 require __DIR__ . '/db.php';
 
 try {
-  // -------- Required scalar fields (multipart/form-data) --------
+  // Validate required scalar fields from multipart/form-data
   $owner_id     = isset($_POST['owner_id']) ? (int)$_POST['owner_id'] : 0;
   $parking_name = trim((string)($_POST['parking_name'] ?? ''));
   $location     = trim((string)($_POST['location'] ?? ''));
@@ -17,7 +17,7 @@ try {
   $description  = trim((string)($_POST['description'] ?? ''));
   $price_unit   = trim((string)($_POST['price_unit'] ?? 'hour'));
 
-  // Lat/Lng required
+  // ✅ Lat/Lng required (your UI ensures Verify before submit)
   $lat_raw = trim((string)($_POST['latitude'] ?? ''));
   $lng_raw = trim((string)($_POST['longitude'] ?? ''));
   if ($lat_raw === '' || $lng_raw === '') {
@@ -30,7 +30,7 @@ try {
     send_json(["success"=>false, "message"=>"Missing required fields"], 400);
   }
 
-  // Pricing (optional)
+  // Pricing (optional but provided by UI)
   $price_cars  = isset($_POST['price_cars'])  ? (int)$_POST['price_cars']  : 0;
   $price_vans  = isset($_POST['price_vans'])  ? (int)$_POST['price_vans']  : 0;
   $price_bikes = isset($_POST['price_bikes']) ? (int)$_POST['price_bikes'] : 0;
@@ -42,18 +42,15 @@ try {
   $spaces_bikes = isset($_POST['spaces_bikes']) ? (int)$_POST['spaces_bikes'] : 0;
   $spaces_buses = isset($_POST['spaces_buses']) ? (int)$_POST['spaces_buses'] : 0;
 
-  // -------- Prepare upload folder --------
+  // ---- Prepare upload folder ----
   $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $parking_name));
-  if ($slug === '') { $slug = 'space-'.time(); }
-
-  $relDir = "uploads/owners/{$owner_id}/{$slug}/";       // stored in DB
+  $relDir = "uploads/owners/{$owner_id}/{$slug}/";
   $absDir = rtrim(__DIR__, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relDir);
-
   if (!is_dir($absDir) && !@mkdir($absDir, 0777, true)) {
     send_json(["success"=>false, "message"=>"Failed to create upload directory"], 500);
   }
 
-  // -------- Agreement (PDF) optional --------
+  // ---- Move Agreement (PDF) if any ----
   $agreement_path = null;
   if (isset($_FILES['agreement']) && is_array($_FILES['agreement']) && $_FILES['agreement']['error'] === UPLOAD_ERR_OK) {
     $ts = time();
@@ -65,48 +62,31 @@ try {
     $agreement_path = $relDir . $agreeName;
   }
 
-  // -------- Photos: accept `photos` OR `photos[]` (single/multiple) --------
+  // ---- Move Photos[] if any ----
   $savedPhotos = [];
+  if (isset($_FILES['photos']) || isset($_FILES['photos']['name'])) {
+    // photos[] arrives as 'photos'
+    $names = $_FILES['photos']['name'] ?? [];
+    $tmps  = $_FILES['photos']['tmp_name'] ?? [];
+    $errs  = $_FILES['photos']['error'] ?? [];
+    $count = is_array($names) ? count($names) : 0;
 
-  $field = null;
-  if (isset($_FILES['photos']))       { $field = $_FILES['photos']; }
-  elseif (isset($_FILES['photos[]'])) { $field = $_FILES['photos[]']; }
-
-  if ($field && isset($field['name'])) {
-    $names = is_array($field['name']) ? $field['name'] : [$field['name']];
-    $tmps  = is_array($field['tmp_name']) ? $field['tmp_name'] : [$field['tmp_name']];
-    $errs  = is_array($field['error']) ? $field['error'] : [$field['error']];
-
-    $allowed = ['jpg','jpeg','png','gif','webp'];
-
-    foreach ($names as $i => $orig) {
-      if (!isset($errs[$i]) || $errs[$i] !== UPLOAD_ERR_OK) { continue; }
-
-      $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
-      if ($ext === '' || !in_array($ext, $allowed, true)) {
-        // best effort infer from mime if extension missing
-        $mime = @mime_content_type($tmps[$i]) ?: '';
-        if (strpos($mime, 'jpeg') !== false) $ext = 'jpg';
-        elseif (strpos($mime, 'png') !== false) $ext = 'png';
-        elseif (strpos($mime, 'gif') !== false) $ext = 'gif';
-        elseif (strpos($mime, 'webp') !== false) $ext = 'webp';
-        else continue;
-      }
-
-      $filename = sprintf("photo_%d_%s.%s", $i+1, bin2hex(random_bytes(4)), $ext);
+    for ($i = 0; $i < $count; $i++) {
+      if ($errs[$i] !== UPLOAD_ERR_OK) { continue; }
+      $ext = strtolower(pathinfo($names[$i], PATHINFO_EXTENSION));
+      if ($ext === '') { $ext = 'jpg'; }
+      $filename = sprintf("photo_%d_%s.%s", $i+1, uniqid(), $ext);
       $dest = $absDir . $filename;
       if (@move_uploaded_file($tmps[$i], $dest)) {
-        $savedPhotos[] = $relDir . $filename; // relative path we can expose later
+        $savedPhotos[] = $relDir . $filename;
       }
     }
   }
 
-  // -------- Insert DB rows --------
+  // ---- Insert into DB ----
   $mysqli->begin_transaction();
 
-  // Always store the folder path (even if currently empty)
-  $photos_path = $relDir;
-
+  // parking_space
   $sql = "INSERT INTO parking_space
           (owner_id, parking_name, location, availability, status, description, agreement_path, photos_path, latitude, longitude)
           VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)";
@@ -115,8 +95,7 @@ try {
     $mysqli->rollback();
     send_json(["success"=>false, "message"=>"prepare failed (parking_space)"], 500);
   }
-
-  // i s s s s s s d d  (9 placeholders after the literal 'pending')
+  $photos_path = $relDir; // folder path
   $stmt->bind_param(
     "issssssdd",
     $owner_id,
@@ -129,26 +108,24 @@ try {
     $latitude,
     $longitude
   );
-
   if (!$stmt->execute()) {
-    $stmt->close();
     $mysqli->rollback();
     send_json(["success"=>false, "message"=>"insert failed (parking_space)"], 500);
   }
   $parking_space_id = $stmt->insert_id;
   $stmt->close();
 
-  // spaces snapshot
-  if ($spaces_cars || $spaces_vans || $spaces_bikes || $spaces_buses) {
-    if ($stmt = $mysqli->prepare("INSERT INTO spaces (parking_space_id, cars, vans, bikes, buses) VALUES (?, ?, ?, ?, ?)")) {
-      $stmt->bind_param("iiiii", $parking_space_id, $spaces_cars, $spaces_vans, $spaces_bikes, $spaces_buses);
-      $stmt->execute();
-      $stmt->close();
-    }
+  // spaces (counts snapshot)
+  $sqlSpaces = "INSERT INTO spaces (parking_space_id, cars, vans, bikes, buses) VALUES (?, ?, ?, ?, ?)";
+  if ($stmt = $mysqli->prepare($sqlSpaces)) {
+    $stmt->bind_param("iiiii", $parking_space_id, $spaces_cars, $spaces_vans, $spaces_bikes, $spaces_buses);
+    $stmt->execute();
+    $stmt->close();
   }
 
   // pricing
-  if ($stmt = $mysqli->prepare("INSERT INTO pricing (parking_space_id, price_unit, cars, vans, bikes, buses) VALUES (?, ?, ?, ?, ?, ?)")) {
+  $sqlPrice = "INSERT INTO pricing (parking_space_id, price_unit, cars, vans, bikes, buses) VALUES (?, ?, ?, ?, ?, ?)";
+  if ($stmt = $mysqli->prepare($sqlPrice)) {
     $stmt->bind_param("isiiii", $parking_space_id, $price_unit, $price_cars, $price_vans, $price_bikes, $price_buses);
     $stmt->execute();
     $stmt->close();
@@ -156,15 +133,12 @@ try {
 
   $mysqli->commit();
 
-  // -------- Build absolute URLs for newly-saved photos (response sugar) --------
-  $isHttps = (
-    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-    (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-  );
-  $scheme  = $isHttps ? 'https' : 'http';
+  // Build web base
+  $scheme  = $_SERVER['REQUEST_SCHEME'] ?? 'http';
   $host    = $_SERVER['HTTP_HOST'] ?? 'localhost';
   $webBase = rtrim($scheme . '://' . $host, '/') . '/Parkmate';
 
+  // Convert saved photos to absolute URLs
   $photos_urls = array_map(function($rel) use ($webBase) {
     $rel = ltrim($rel, '/');
     return $webBase . '/' . $rel;
@@ -181,6 +155,6 @@ try {
   ]);
 
 } catch (Throwable $e) {
-  if ($mysqli) { @mysqli_rollback($mysqli); }
+  if ($mysqli && $mysqli->errno) { @$mysqli->rollback(); }
   send_json(["success"=>false, "message"=>"Server error"], 500);
 }
