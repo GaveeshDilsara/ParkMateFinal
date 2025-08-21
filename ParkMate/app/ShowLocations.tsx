@@ -42,6 +42,7 @@ const MUTED = "#9CA3AF";
 /* ---------- Navigation Types ---------- */
 type RootStackParamList = {
   Driver_Home: undefined;
+  Login_Driver: undefined; // ✅ Needed for logout navigation
   ShowLocations:
     | {
         spaces?: NearbySpace[];
@@ -54,7 +55,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList, "ShowLocations">;
 type Rte = RouteProp<RootStackParamList, "ShowLocations">;
 
 /* ---------- Local UI Space type ---------- */
-
 
 type PriceUnit = "hour" | "day";
 
@@ -92,10 +92,6 @@ type UISpace = Omit<
 };
 
 type SpaceView = UISpace & { _id: string };
-
-
-
-
 
 /* ---------- For price chips ---------- */
 type PriceCat = {
@@ -232,6 +228,31 @@ export default function ShowLocations() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const bannerRef = useRef<ScrollView | null>(null);
 
+  // 🔒 Logout handler with confirm/cancel
+  const onLogoutPress = useCallback(() => {
+    Alert.alert(
+      "Log out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem("pm_driver");
+            } catch {}
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Login_Driver" }],
+            });
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  }, [navigation]);
+
   // Load greeting on focus
   useFocusEffect(
     useCallback(() => {
@@ -365,19 +386,34 @@ export default function ShowLocations() {
         <Pressable style={styles.iconBtn} onPress={goBack}>
           <Ionicons name="arrow-back" size={22} color={TEXT} />
         </Pressable>
+
         <View style={styles.greetingWrap}>
           <Text style={styles.hello}>Welcome Back,</Text>
           <Text style={styles.userRow}>
-            <Text style={styles.user}>{greetingName}</Text> <Text style={styles.wave}>👋</Text>
+            <Text style={styles.user}>{greetingName}</Text>{" "}
+            <Text style={styles.wave}>👋</Text>
           </Text>
         </View>
-        <View style={styles.avatarWrap}>
-          <Image
-            source={{
-              uri: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=300&auto=format&fit=crop",
-            }}
-            style={styles.avatar}
-          />
+
+        {/* Right side: Logout + Avatar */}
+        <View style={styles.rightRow}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={onLogoutPress}
+            accessibilityRole="button"
+            accessibilityLabel="Log out"
+          >
+            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          </Pressable>
+
+          <View style={styles.avatarWrap}>
+            <Image
+              source={{
+                uri: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=300&auto=format&fit=crop",
+              }}
+              style={styles.avatar}
+            />
+          </View>
         </View>
       </View>
 
@@ -608,6 +644,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#fff",
+  },
+  rightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   greetingWrap: { flex: 1 },
   hello: { color: SUB, fontSize: 12, fontWeight: "700" },
