@@ -17,6 +17,10 @@ import {
   Linking,
   Platform,
   Alert,
+  Animated,
+  Dimensions,
+  BackHandler,
+  InteractionManager,
 } from "react-native";
 import {
   useNavigation,
@@ -39,10 +43,18 @@ const SUB = "#6B7280";
 const BORDER = "#E5E7EB";
 const MUTED = "#9CA3AF";
 
+/* ---------- Drawer ---------- */
+const { width: W } = Dimensions.get("window");
+const DRAWER_WIDTH = Math.min(W * 0.78, 320);
+
 /* ---------- Navigation Types ---------- */
 type RootStackParamList = {
   Driver_Home: undefined;
-  Login_Driver: undefined; // ✅ Needed for logout navigation
+  Login_Driver: undefined;
+  ChooseRole: undefined; // for "Change Role"
+  About?: undefined; // optional
+  Contact_Us?: undefined; // optional
+  Payment_Info?: undefined; // optional
   ShowLocations:
     | {
         spaces?: NearbySpace[];
@@ -55,7 +67,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList, "ShowLocations">;
 type Rte = RouteProp<RootStackParamList, "ShowLocations">;
 
 /* ---------- Local UI Space type ---------- */
-
 type PriceUnit = "hour" | "day";
 
 type UISpace = Omit<
@@ -203,12 +214,17 @@ async function openDirections(
   }
 }
 
-/* ---------- Small util ---------- */
+/* ---------- Small utils ---------- */
 function firstName(name?: string) {
   if (!name) return "";
   const n = String(name).trim();
   const space = n.indexOf(" ");
   return space > 0 ? n.slice(0, space) : n;
+}
+function pad3(v: unknown) {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return null;
+  return String(Math.floor(n)).padStart(3, "0");
 }
 
 export default function ShowLocations() {
@@ -216,6 +232,7 @@ export default function ShowLocations() {
   const route = useRoute<Rte>();
 
   const [driverName, setDriverName] = useState<string>("");
+  const [driverId, setDriverId] = useState<string | null>(null);
 
   const [live, setLive] = useState<NearbySpace[] | null>(route.params?.spaces ?? null);
   const [center, setCenter] = useState<{ lat: number; lng: number } | null>(
@@ -228,32 +245,100 @@ export default function ShowLocations() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const bannerRef = useRef<ScrollView | null>(null);
 
+  /* ---------- Side Drawer state ---------- */
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const drawerX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+
+  const defer = useCallback((fn: () => void) => {
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(fn);
+    });
+  }, []);
+
+  const openDrawer = useCallback(() => {
+    setDrawerVisible(true);
+    Animated.timing(drawerX, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [drawerX]);
+
+  const closeDrawer = useCallback(
+    (after?: () => void) => {
+      Animated.timing(drawerX, {
+        toValue: -DRAWER_WIDTH,
+        duration: 220,
+        useNativeDriver: true,
+      }).start(() => {
+        setDrawerVisible(false);
+        if (after) defer(after);
+      });
+    },
+    [drawerX, defer]
+  );
+
+  // Android back button should close drawer first
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (drawerVisible) {
+        closeDrawer();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [drawerVisible, closeDrawer]);
+
   // 🔒 Logout handler with confirm/cancel
   const onLogoutPress = useCallback(() => {
-    Alert.alert(
-      "Log out",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log out",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem("pm_driver");
-            } catch {}
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Login_Driver" }],
-            });
-          },
-        },
-      ],
-      { cancelable: true }
+    const go = async () => {
+      try {
+        await AsyncStorage.removeItem("pm_driver");
+      } catch {}
+      navigation.reset({ index: 0, routes: [{ name: "Login_Driver" }] });
+    };
+    closeDrawer(() =>
+      Alert.alert(
+        "Log out",
+        "Are you sure you want to log out?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Log out", style: "destructive", onPress: () => defer(go) },
+        ],
+        { cancelable: true }
+      )
     );
-  }, [navigation]);
+  }, [navigation, closeDrawer, defer]);
 
-  // Load greeting on focus
+  const onChangeRole = useCallback(() => {
+    closeDrawer(() => navigation.navigate("ChooseRole"));
+  }, [closeDrawer, navigation]);
+
+  const goHome = useCallback(() => {
+    closeDrawer(() => navigation.navigate("Driver_Home"));
+  }, [closeDrawer, navigation]);
+
+  const goAbout = useCallback(() => {
+    closeDrawer(() =>
+      Alert.alert("About", "About screen is not connected yet.")
+    );
+  }, [closeDrawer]);
+
+  const goContact = useCallback(() => {
+    closeDrawer(() =>
+      Alert.alert(
+        "Contact Us",
+        "Contact screen is not connected yet.\n\nEmail: support@parkmate.local\nPhone: +94 11 123 4567"
+      )
+    );
+  }, [closeDrawer]);
+
+  const goPaymentInfo = useCallback(() => {
+    closeDrawer(() => Alert.alert("Payment Info", "Payment Info screen is not connected yet."));
+  }, [closeDrawer]);
+
+  // Load greeting + driver ID on focus
   useFocusEffect(
     useCallback(() => {
       let mounted = true;
@@ -265,11 +350,23 @@ export default function ShowLocations() {
             const obj = JSON.parse(raw);
             const nm: string | undefined = obj?.name ?? obj?.driver?.name;
             setDriverName(nm ? firstName(nm) : "");
+
+            const idCand =
+              obj?.id ??
+              obj?.driver?.id ??
+              obj?.driver_id ??
+              obj?.pin ??
+              obj?.driver?.pin ??
+              obj?.userId;
+            const formatted = pad3(idCand);
+            setDriverId(formatted);
           } else {
             setDriverName("");
+            setDriverId(null);
           }
         } catch {
           setDriverName("");
+          setDriverId(null);
         }
       })();
       return () => {
@@ -375,37 +472,37 @@ export default function ShowLocations() {
     if (idx !== bannerIndex) setBannerIndex(idx);
   };
 
-  const goBack = () => navigation.goBack();
   const greetingName = driverName ? driverName : "Driver";
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
-      {/* Top Bar */}
+
+      {/* ---------- Beautiful Top Bar ---------- */}
       <View style={styles.topBar}>
-        <Pressable style={styles.iconBtn} onPress={goBack}>
-          <Ionicons name="arrow-back" size={22} color={TEXT} />
+        {/* Hamburger */}
+        <Pressable style={styles.iconBtn} onPress={openDrawer} accessibilityLabel="Open menu">
+          <Ionicons name="menu-outline" size={22} color={TEXT} />
         </Pressable>
 
-        <View style={styles.greetingWrap}>
-          <Text style={styles.hello}>Welcome Back,</Text>
-          <Text style={styles.userRow}>
-            <Text style={styles.user}>{greetingName}</Text>{" "}
-            <Text style={styles.wave}>👋</Text>
-          </Text>
+        <View style={styles.titleWrap}>
+          <Text style={styles.headerTitle}>Nearby Locations</Text>
+
+          {center && (
+            <View style={styles.statusChip}>
+              <View style={[styles.statusDot, { backgroundColor: "#22C55E" }]} />
+              <Text style={styles.statusChipText}>
+                Live near {center.lat.toFixed(4)}, {center.lng.toFixed(4)} · 2 km radius
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Right side: Logout + Avatar */}
+        {/* Right side: Driver ID + Avatar */}
         <View style={styles.rightRow}>
-          <Pressable
-            style={styles.iconBtn}
-            onPress={onLogoutPress}
-            accessibilityRole="button"
-            accessibilityLabel="Log out"
-          >
-            <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-          </Pressable>
-
+          <View style={styles.idPill}>
+            <Text style={styles.idPillText}>{driverId ?? "--"}</Text>
+          </View>
           <View style={styles.avatarWrap}>
             <Image
               source={{
@@ -417,16 +514,7 @@ export default function ShowLocations() {
         </View>
       </View>
 
-      {center && (
-        <View style={styles.statusStrip}>
-          <Ionicons name="radio-outline" size={14} color="#10B981" />
-          <Text style={styles.statusText}>
-            Live near {center.lat.toFixed(4)}, {center.lng.toFixed(4)} · 2 km radius
-          </Text>
-          <View style={styles.statusDot} />
-        </View>
-      )}
-
+      {/* ---------- Content ---------- */}
       <ScrollView
         contentContainerStyle={{ paddingBottom: 28 }}
         showsVerticalScrollIndicator={false}
@@ -608,7 +696,93 @@ export default function ShowLocations() {
             );
           })}
       </ScrollView>
+
+      {/* ---------- Drawer Overlay + Panel (Card style) ---------- */}
+      {drawerVisible && <Pressable style={styles.backdrop} onPress={() => closeDrawer()} />}
+
+      <Animated.View
+        style={[
+          styles.drawer,
+          {
+            transform: [{ translateX: drawerX }],
+          },
+        ]}
+      >
+        <View style={styles.drawerContainer}>
+          {/* Header card */}
+          <View style={styles.drawerHeaderCard}>
+            <View style={styles.drawerHeaderRow}>
+              <View style={styles.drawerAvatar}>
+                <Image
+                  source={{
+                    uri: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=300&auto=format&fit=crop",
+                  }}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.drawerHello}>Welcome,</Text>
+                <Text style={styles.drawerName} numberOfLines={1}>
+                  {greetingName}
+                </Text>
+              </View>
+              <View style={styles.drawerIdPill}>
+                <Text style={styles.drawerIdText}>{driverId ?? "--"}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Main links (scrollable) */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.drawerScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <DrawerItemCard icon="home-outline" label="Home" onPress={goHome} />
+            <DrawerItemCard icon="information-circle-outline" label="About" onPress={goAbout} />
+            <DrawerItemCard icon="call-outline" label="Contact Us" onPress={goContact} />
+            <DrawerItemCard icon="card-outline" label="Payment Info" onPress={goPaymentInfo} />
+          </ScrollView>
+
+          {/* Bottom actions */}
+          <View style={styles.drawerBottom}>
+            <DrawerItemCard icon="swap-horizontal-outline" label="Change Role" onPress={onChangeRole} />
+            <DrawerItemCard icon="log-out-outline" label="Log out" danger onPress={onLogoutPress} />
+          </View>
+        </View>
+      </Animated.View>
     </SafeAreaView>
+  );
+}
+
+/* ---------- Drawer Item (Card) component ---------- */
+function DrawerItemCard({
+  icon,
+  label,
+  onPress,
+  danger,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.drawerCard,
+        pressed && { transform: [{ scale: 0.99 }], opacity: 0.95 },
+      ]}
+    >
+      <View style={styles.drawerCardRow}>
+        <View style={[styles.drawerIconWrap, danger && { backgroundColor: "rgba(239,68,68,0.08)" }]}>
+          <Ionicons name={icon} size={18} color={danger ? "#EF4444" : BRAND} />
+        </View>
+        <Text style={[styles.drawerItemLabel, danger && { color: "#EF4444" }]}>{label}</Text>
+        <Ionicons name="chevron-forward" size={18} color={danger ? "#EF4444" : SUB} style={{ marginLeft: "auto" }} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -625,52 +799,67 @@ function formatKm(km?: number | null) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
 
-  /* Top bar */
+  /* Beautiful Top bar (like Driver_Home) */
   topBar: {
+    backgroundColor: CARD,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
     gap: 12,
-    backgroundColor: BG,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
   iconBtn: {
-    height: 36,
-    width: 36,
-    borderRadius: 18,
+    height: 40,
+    width: 40,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: BORDER,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#fff",
   },
-  rightRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  greetingWrap: { flex: 1 },
-  hello: { color: SUB, fontSize: 12, fontWeight: "700" },
-  userRow: { marginTop: 2 },
-  user: { color: TEXT, fontSize: 18, fontWeight: "900" },
-  wave: { fontSize: 18 },
-  avatarWrap: { height: 36, width: 36, borderRadius: 18, overflow: "hidden" },
-  avatar: { height: "100%", width: "100%" },
+  titleWrap: { flex: 1 },
+  headerTitle: { color: TEXT, fontSize: 20, fontWeight: "900", letterSpacing: 0.2 },
 
-  /* Status strip */
-  statusStrip: {
+  statusChip: {
+    marginTop: 6,
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
-  statusText: { color: SUB, fontSize: 12, fontWeight: "700" },
-  statusDot: { marginLeft: "auto", height: 8, width: 8, borderRadius: 4, backgroundColor: "#22C55E" },
+  statusChipText: { color: SUB, fontSize: 12, fontWeight: "700" },
+  statusDot: { height: 8, width: 8, borderRadius: 4 },
+
+  rightRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  idPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  idPillText: { color: TEXT, fontWeight: "900", fontSize: 12, letterSpacing: 1 },
+  avatarWrap: { height: 36, width: 36, borderRadius: 18, overflow: "hidden" },
+  avatar: { height: "100%", width: "100%" },
 
   /* Banner */
-  bannerWrap: { marginTop: 6 },
+  bannerWrap: { marginTop: 10 },
   banner: { height: 160, width: "100%", justifyContent: "flex-end" } as any,
   bannerImg: { resizeMode: "cover", borderRadius: 16, marginHorizontal: 16 },
   dotsRow: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 8 },
@@ -705,7 +894,7 @@ const styles = StyleSheet.create({
   },
   retryText: { color: "#fff", fontWeight: "800", fontSize: 13 },
 
-  /* Card */
+  /* Location Card */
   locationCard: {
     marginTop: 16,
     marginHorizontal: 16,
@@ -808,4 +997,89 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+
+  /* Drawer (card-style like Driver_Home) */
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  drawer: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: DRAWER_WIDTH,
+    backgroundColor: BG,
+    borderRightWidth: 1,
+    borderRightColor: BORDER,
+  },
+  drawerContainer: { flex: 1, padding: 12, paddingTop: 16 },
+  drawerHeaderCard: {
+    marginTop:100,
+    backgroundColor: CARD,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+    padding: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+    marginBottom: 12,
+  },
+  drawerHeaderRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  drawerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  drawerHello: { color: SUB, fontSize: 12, fontWeight: "700" },
+  drawerName: { color: TEXT, fontSize: 18, fontWeight: "900" },
+  drawerIdPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  drawerIdText: { color: TEXT, fontWeight: "900", fontSize: 12, letterSpacing: 1 },
+
+  drawerScrollContent: { paddingBottom: 12, gap: 12 },
+
+  drawerCard: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  drawerCardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  drawerIconWrap: {
+    height: 32,
+    width: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(47,128,237,0.10)", // BRAND tint
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  drawerItemLabel: { fontSize: 14, color: TEXT, fontWeight: "800" },
+
+  drawerBottom: {
+    paddingTop: 8,
+    paddingBottom: Platform.OS === "ios" ? 16 : 12,
+    gap: 10,
+  },
 });

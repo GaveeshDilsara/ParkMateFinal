@@ -8,18 +8,32 @@ import {
   StyleSheet,
   Text,
   View,
+  Alert,
+  Animated,
+  Dimensions,
+  BackHandler,
+  Image,
+  ScrollView,
+  InteractionManager,
 } from "react-native";
 import MapView, { Marker, Circle, Region, Callout } from "react-native-maps";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import { NearbySpace, searchNearbySpaces } from "./api";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const BRAND = "#2F80ED";
 const BG = "#F5F7FB";
 const TEXT = "#111827";
 const SUB = "#6B7280";
+const CARD = "#FFFFFF";
+const BORDER = "#E5E7EB";
+
+/* Drawer config */
+const { width: W } = Dimensions.get("window");
+const DRAWER_WIDTH = Math.min(W * 0.78, 320);
 
 const FALLBACK_CENTER = { latitude: 6.9, longitude: 79.861 }; // Thummulla approx
 const INITIAL_DELTA = { latitudeDelta: 0.02, longitudeDelta: 0.02 };
@@ -28,12 +42,35 @@ const RADIUS_METERS = 2000; // 2 km
 // Infer instance type of <Marker /> so refs support showCallout/hideCallout
 type MarkerRef = React.ComponentRef<typeof Marker>;
 
-// ---- Navigation types (adjust route names if your navigator differs) ----
+// ---- Navigation types (extend for the new routes) ----
 type RootStackParamList = {
   Driver_Home: undefined;
   ShowLocations: { spaces?: NearbySpace[] } | undefined;
+  Login_Driver: undefined;
+  ChooseRole: undefined;
+  About?: undefined;
+  Contact_Us?: undefined;
+  Payment_Info?: undefined;
 };
 type Nav = NativeStackNavigationProp<RootStackParamList, "Driver_Home">;
+
+/* Helpers */
+function formatKm(km?: number) {
+  if (km == null || isNaN(km)) return "-";
+  const digits = km < 10 ? 2 : 1;
+  return `${km.toFixed(digits)} km`;
+}
+function firstName(name?: string) {
+  if (!name) return "";
+  const n = String(name).trim();
+  const sp = n.indexOf(" ");
+  return sp > 0 ? n.slice(0, sp) : n;
+}
+function pad3(v: unknown) {
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return null;
+  return String(Math.floor(n)).padStart(3, "0");
+}
 
 export default function Driver_Home() {
   const navigation = useNavigation<Nav>();
@@ -44,6 +81,14 @@ export default function Driver_Home() {
   const [region, setRegion] = useState<Region>({ ...FALLBACK_CENTER, ...INITIAL_DELTA });
   const [spaces, setSpaces] = useState<NearbySpace[]>([]);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
+
+  // Driver info
+  const [driverName, setDriverName] = useState<string>("");
+  const [driverId, setDriverId] = useState<string | null>(null);
+
+  // Drawer state
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const drawerX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
   const animateTo = useCallback((lat: number, lng: number, zoom = INITIAL_DELTA) => {
     const next = { latitude: lat, longitude: lng, ...zoom };
@@ -105,6 +150,43 @@ export default function Driver_Home() {
     return () => sub?.remove?.();
   }, [animateTo, refreshNearby]);
 
+  // Load greeting + driver ID on focus
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      (async () => {
+        try {
+          const raw = await AsyncStorage.getItem("pm_driver");
+          if (!mounted) return;
+          if (raw) {
+            const obj = JSON.parse(raw);
+            const nm: string | undefined = obj?.name ?? obj?.driver?.name;
+            setDriverName(nm ? firstName(nm) : "");
+
+            const idCand =
+              obj?.id ??
+              obj?.driver?.id ??
+              obj?.driver_id ??
+              obj?.pin ??
+              obj?.driver?.pin ??
+              obj?.userId;
+            const formatted = pad3(idCand);
+            setDriverId(formatted);
+          } else {
+            setDriverName("");
+            setDriverId(null);
+          }
+        } catch {
+          setDriverName("");
+          setDriverId(null);
+        }
+      })();
+      return () => {
+        mounted = false;
+      };
+    }, [])
+  );
+
   const recenter = useCallback(() => {
     animateTo(center.latitude, center.longitude);
   }, [animateTo, center]);
@@ -123,18 +205,134 @@ export default function Driver_Home() {
   );
 
   const goToShowLocations = useCallback(() => {
-    // Pass spaces if you want; ShowLocations can accept it via route.params
     navigation.navigate("ShowLocations", { spaces: sortedSpaces });
   }, [navigation, sortedSpaces]);
 
+  /* Drawer handlers */
+  const defer = useCallback((fn: () => void) => {
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(fn);
+    });
+  }, []);
+
+  const openDrawer = useCallback(() => {
+    setDrawerVisible(true);
+    Animated.timing(drawerX, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [drawerX]);
+
+  const closeDrawer = useCallback(
+    (after?: () => void) => {
+      Animated.timing(drawerX, {
+        toValue: -DRAWER_WIDTH,
+        duration: 220,
+        useNativeDriver: true,
+      }).start(() => {
+        setDrawerVisible(false);
+        if (after) defer(after);
+      });
+    },
+    [drawerX, defer]
+  );
+
+  // Android back closes drawer first
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (drawerVisible) {
+        closeDrawer();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [drawerVisible, closeDrawer]);
+
+  /* Nav item actions */
+  const goHome = useCallback(() => {
+    closeDrawer(() => navigation.navigate("Driver_Home"));
+  }, [closeDrawer, navigation]);
+
+  const goAbout = useCallback(() => {
+    closeDrawer(() => Alert.alert("About", "About screen is not connected yet."));
+  }, [closeDrawer]);
+
+  const goContact = useCallback(() => {
+    closeDrawer(() =>
+      Alert.alert(
+        "Contact Us",
+        "Contact screen is not connected yet.\n\nEmail: support@parkmate.local\nPhone: +94 11 123 4567"
+      )
+    );
+  }, [closeDrawer]);
+
+  const goPaymentInfo = useCallback(() => {
+    closeDrawer(() => Alert.alert("Payment Info", "Payment Info screen is not connected yet."));
+  }, [closeDrawer]);
+
+  const onChangeRole = useCallback(() => {
+    closeDrawer(() => navigation.navigate("ChooseRole"));
+  }, [closeDrawer, navigation]);
+
+  const onLogoutPress = useCallback(() => {
+    const doLogout = async () => {
+      try {
+        await AsyncStorage.removeItem("pm_driver");
+      } catch {}
+      navigation.reset({ index: 0, routes: [{ name: "Login_Driver" }] });
+    };
+    closeDrawer(() =>
+      Alert.alert(
+        "Log out",
+        "Are you sure you want to log out?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Log out", style: "destructive", onPress: () => defer(doLogout) },
+        ],
+        { cancelable: true }
+      )
+    );
+  }, [navigation, closeDrawer, defer]);
+
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Nearby Parking (2 km)</Text>
-        <Text style={styles.headerSub}>
-          {hasPermission ? "Live location enabled" : "Using fallback location"}
-        </Text>
+      {/* Beautiful Header */}
+      <View style={styles.topBar}>
+        <Pressable style={styles.iconBtn} onPress={openDrawer} accessibilityLabel="Open menu">
+          <Ionicons name="menu-outline" size={22} color={TEXT} />
+        </Pressable>
+
+        <View style={styles.titleWrap}>
+          <Text style={styles.headerTitle}>Nearby Parking (2 km)</Text>
+
+          <View style={styles.statusChip}>
+            <View
+              style={[
+                styles.dot,
+                { backgroundColor: hasPermission ? "#22C55E" : "#F59E0B" },
+              ]}
+            />
+            <Text style={styles.statusChipText}>
+              {hasPermission ? "Live location enabled" : "Using fallback location"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.rightRow}>
+          <View style={styles.idPill}>
+            <Text style={styles.idPillText}>{driverId ?? "--"}</Text>
+          </View>
+          <View style={styles.avatarWrap}>
+            <Image
+              source={{
+                uri: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=300&auto=format&fit=crop",
+              }}
+              style={styles.avatar}
+            />
+          </View>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -224,7 +422,20 @@ export default function Driver_Home() {
               ))}
             </MapView>
 
-            {/* Floating recenter button (raised so it doesn't overlap bottom button) */}
+            {/* Map Legend */}
+            <View style={styles.legend}>
+              <Text style={styles.legendTitle}>Legend</Text>
+              <View style={styles.legendRow}>
+                <Ionicons name="location-sharp" size={20} color="#2563EB" />
+                <Text style={styles.legendLabel}>Live location</Text>
+              </View>
+              <View style={styles.legendRow}>
+                <Ionicons name="location-sharp" size={20} color="#EF4444" />
+                <Text style={styles.legendLabel}>Parking spaces</Text>
+              </View>
+            </View>
+
+            {/* Floating recenter button (raised to clear bottom button) */}
             <Pressable style={styles.fab} onPress={recenter}>
               <Ionicons name="locate" size={22} color="#fff" />
             </Pressable>
@@ -242,36 +453,216 @@ export default function Driver_Home() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* ---------- Drawer Overlay + Panel ---------- */}
+      {drawerVisible && <Pressable style={styles.backdrop} onPress={() => closeDrawer()} />}
+
+      <Animated.View
+        style={[
+          styles.drawer,
+          {
+            transform: [{ translateX: drawerX }],
+          },
+        ]}
+      >
+        <View style={styles.drawerContainer}>
+          {/* Header card */}
+          <View style={styles.drawerHeaderCard}>
+            <View style={styles.drawerHeaderRow}>
+              <View style={styles.drawerAvatar}>
+                <Image
+                  source={{
+                    uri: "https://images.unsplash.com/photo-1541534401786-2077eed87a72?q=80&w=300&auto=format&fit=crop",
+                  }}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.drawerHello}>Welcome,</Text>
+                <Text style={styles.drawerName} numberOfLines={1}>
+                  {driverName ? firstName(driverName) : "Driver"}
+                </Text>
+              </View>
+              <View style={styles.drawerIdPill}>
+                <Text style={styles.drawerIdText}>{driverId ?? "--"}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Main links (scrollable) */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.drawerScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <DrawerItemCard
+              icon="home-outline"
+              label="Home"
+              onPress={goHome}
+            />
+            <DrawerItemCard
+              icon="information-circle-outline"
+              label="About"
+              onPress={goAbout}
+            />
+            <DrawerItemCard
+              icon="call-outline"
+              label="Contact Us"
+              onPress={goContact}
+            />
+            <DrawerItemCard
+              icon="card-outline"
+              label="Payment Info"
+              onPress={goPaymentInfo}
+            />
+          </ScrollView>
+
+          {/* Bottom actions */}
+          <View style={styles.drawerBottom}>
+            <DrawerItemCard
+              icon="swap-horizontal-outline"
+              label="Change Role"
+              onPress={onChangeRole}
+            />
+            <DrawerItemCard
+              icon="log-out-outline"
+              label="Log out"
+              danger
+              onPress={onLogoutPress}
+            />
+          </View>
+        </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
-function formatKm(km?: number) {
-  if (km == null || isNaN(km)) return "-";
-  const digits = km < 10 ? 2 : 1;
-  return `${km.toFixed(digits)} km`;
+/* Drawer Item (Card) component */
+function DrawerItemCard({
+  icon,
+  label,
+  onPress,
+  danger,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.drawerCard,
+        pressed && { transform: [{ scale: 0.99 }], opacity: 0.95 },
+      ]}
+    >
+      <View style={styles.drawerCardRow}>
+        <View style={[styles.drawerIconWrap, danger && { backgroundColor: "rgba(239,68,68,0.08)" }]}>
+          <Ionicons name={icon} size={18} color={danger ? "#EF4444" : BRAND} />
+        </View>
+        <Text style={[styles.drawerItemLabel, danger && { color: "#EF4444" }]}>{label}</Text>
+        <Ionicons
+          name="chevron-forward"
+          size={18}
+          color={danger ? "#EF4444" : SUB}
+          style={{ marginLeft: "auto" }}
+        />
+      </View>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
   container: { flex: 1, backgroundColor: BG },
 
-  header: {
-    backgroundColor: BRAND,
+  /* Beautiful Top Bar */
+  topBar: {
+    backgroundColor: CARD,
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
-  headerTitle: { color: "#FFF", fontSize: 18, fontWeight: "800" },
-  headerSub: { color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "600", marginTop: 2 },
+  iconBtn: {
+    height: 40,
+    width: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  titleWrap: { flex: 1 },
+  headerTitle: { color: TEXT, fontSize: 20, fontWeight: "900", letterSpacing: 0.2 },
+  statusChip: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  statusChipText: { color: SUB, fontSize: 12, fontWeight: "700" },
+  dot: { height: 8, width: 8, borderRadius: 4 },
+
+  rightRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  idPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  idPillText: { color: TEXT, fontWeight: "900", fontSize: 12, letterSpacing: 1 },
+  avatarWrap: { height: 36, width: 36, borderRadius: 18, overflow: "hidden" },
+  avatar: { height: "100%", width: "100%" },
 
   mapWrap: { flex: 1, backgroundColor: "#E5E7EB" },
+
+  /* Map Legend */
+  legend: {
+    position: 'absolute',
+    left: 12,
+    top: 12,
+    backgroundColor: CARD,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  legendTitle: { color: SUB, fontSize: 11, fontWeight: "800", marginBottom: 6 },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
+  legendLabel: { color: TEXT, fontSize: 12, fontWeight: "700" },
 
   /* Floating Action Button */
   fab: {
     position: "absolute",
     right: 16,
-    bottom: 88, // was 16; lifted to clear the bottom bar
+    bottom: 88, // lifted to clear bottom button
     height: 48,
     width: 48,
     borderRadius: 24,
@@ -309,9 +700,7 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: 0.3 },
 
   /* ---- Custom Callout ---- */
-  calloutContainer: {
-    alignItems: "center",
-  },
+  calloutContainer: { alignItems: "center" },
   calloutCard: {
     maxWidth: 280,
     minWidth: 220,
@@ -327,11 +716,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
-  calloutHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
+  calloutHeaderRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
   calloutTitle: { flex: 1, fontSize: 16, fontWeight: "800", color: TEXT },
   calloutBadge: {
     flexDirection: "row",
@@ -343,23 +728,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   calloutBadgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-
-  calloutRow: {
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "flex-start",
-    marginBottom: 6,
-  },
+  calloutRow: { flexDirection: "row", gap: 6, alignItems: "flex-start", marginBottom: 6 },
   calloutSub: { flex: 1, color: SUB, fontSize: 13, lineHeight: 18 },
-
-  calloutFooterRow: {
-    marginTop: 2,
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
+  calloutFooterRow: { marginTop: 2, flexDirection: "row", justifyContent: "flex-end" },
   calloutHint: { color: SUB, fontSize: 11, fontWeight: "600" },
-
-  // Arrow (little pointer under the bubble)
   calloutArrowBorder: {
     width: 0,
     height: 0,
@@ -382,5 +754,87 @@ const styles = StyleSheet.create({
     borderRightColor: "transparent",
     borderTopColor: "#FFFFFF",
     alignSelf: "center",
+  },
+
+  /* Drawer (card-style) */
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.28)" },
+  drawer: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: DRAWER_WIDTH,
+    backgroundColor: BG,
+    borderRightWidth: 1,
+    borderRightColor: BORDER,
+  },
+  drawerContainer: { flex: 1, padding: 12, paddingTop: 16 },
+  drawerHeaderCard: {
+    marginTop:100,
+    backgroundColor: CARD,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+    padding: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+    marginBottom: 12,
+  },
+  drawerHeaderRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  drawerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  drawerHello: { color: SUB, fontSize: 12, fontWeight: "700" },
+  drawerName: { color: TEXT, fontSize: 18, fontWeight: "900" },
+  drawerIdPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  drawerIdText: { color: TEXT, fontWeight: "900", fontSize: 12, letterSpacing: 1 },
+
+  drawerScrollContent: { paddingBottom: 12, gap: 12 },
+
+  drawerCard: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#EEF2F7",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  drawerCardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  drawerIconWrap: {
+    height: 32,
+    width: 32,
+    borderRadius: 10,
+    backgroundColor: "rgba(47,128,237,0.10)", // BRAND tint
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  drawerItemLabel: { fontSize: 14, color: TEXT, fontWeight: "800" },
+
+  drawerBottom: {
+    paddingTop: 8,
+    paddingBottom: Platform.OS === "ios" ? 16 : 12,
+    gap: 10,
   },
 });
