@@ -1017,6 +1017,9 @@ const styles = StyleSheet.create({
   drawerHeaderCard: {
     marginTop:100,
     backgroundColor: CARD,
+
+
+    
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "#EEF2F7",
